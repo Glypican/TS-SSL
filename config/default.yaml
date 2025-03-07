@@ -1,0 +1,59 @@
+# Default configuration for tumor_highlighter
+
+data:
+  wsi_table_path: data/wsi_metadata.csv
+  tissue_mask:
+    downsample_factor: 64
+    hsv_lower: [0, 30, 0]
+    hsv_upper: [180, 255, 255]
+    opening_kernel_size: 5
+    closing_kernel_size: 5
+    min_tissue_size: 1000
+  patch_extraction:
+    patch_size: 256
+    overlap: 0
+    level: 0
+    save_patches: false
+
+models:
+  ts_ssl:
+    input_channels: 3
+    hidden_dim: 128
+    latent_dim: 64
+    attention_heads: 4
+  feature_extractors:
+    resnet18: 
+      enabled: true
+      pretrained: true
+    resnet50: 
+      enabled: true
+      pretrained: true
+    ctranspath: 
+      enabled: false
+      weights_path: pretrained/ctranspath.pth
+
+training:
+  ts_ssl:
+    batch_size: 64
+    epochs: 100
+    learning_rate: 1e-4
+    weight_decay: 1e-5
+    scheduler:
+      name: cosine
+      warmup_epochs: 10
+    loss:
+      name: mse
+      params: {}
+  mil:
+    batch_size: 1
+    epochs: 50
+    learning_rate: 1e-4
+    weight_decay: 1e-5
+
+experiment:
+  output_dir: experiments
+  mlflow:
+    tracking_uri: mlruns
+    experiment_name: tumor_highlighter
+  tensorboard:
+    log_dir: runs
