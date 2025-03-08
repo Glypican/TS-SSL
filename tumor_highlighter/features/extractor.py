@@ -22,7 +22,7 @@ from tiatoolbox.models.engine.semantic_segmentor import DeepFeatureExtractor
 logger = logging.getLogger(__name__)
 
 
-class FeatureExtractorWrapper:
+class FeatureExtractor:
     """
     Wrapper for TIAToolbox's DeepFeatureExtractor.
     
