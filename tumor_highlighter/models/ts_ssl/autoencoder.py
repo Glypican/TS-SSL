@@ -355,7 +355,7 @@ class DecoderBlock(nn.Module):
         return x
 
 
-class SpatialChannelAutoEncoder(nn.Module):
+class SpatialChannelAttentionAutoencoder(nn.Module):
     """
     Spatial-Channel Attention Autoencoder (scAE) for Task-Specific Self-Supervised Learning.
     
