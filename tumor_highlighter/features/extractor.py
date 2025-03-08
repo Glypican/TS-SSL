@@ -317,7 +317,7 @@ class TorchModelFeatureExtractor:
 
 def extract_features_from_patch_folder(
     patch_folder: Union[str, Path],
-    extractor: Union[FeatureExtractorWrapper, TorchModelFeatureExtractor],
+    extractor: Union[FeatureExtractor, TorchModelFeatureExtractor],
     patch_extension: str = "png",
     batch_size: int = 32,
     num_workers: int = 4,
