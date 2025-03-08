@@ -506,7 +506,7 @@ class TS_SSL_Encoder(nn.Module):
     This module extracts the encoder part of the scAE for use in downstream tasks.
     """
     
-    def __init__(self, autoencoder: SpatialChannelAutoEncoder, return_features: bool = False):
+    def __init__(self, autoencoder: SpatialChannelAttentionAutoencoder, return_features: bool = False):
         """
         Initialize the TS-SSL encoder.
         
