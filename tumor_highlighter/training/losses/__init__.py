@@ -11,6 +11,50 @@ import torch.nn.functional as F
 import numpy as np
 from typing import Dict, Optional, Union, Callable
 
+class ReconstructionLoss(nn.Module):
+    """
+    Reconstruction loss for autoencoders.
+    
+    This class provides a standardized interface for autoencoder 
+    reconstruction loss, defaulting to MSESSIMLoss which combines
+    pixel-wise accuracy with structural similarity.
+    """
+    
+    def __init__(
+        self,
+        loss_type: str = 'mse_ssim',
+        alpha: float = 0.5,
+        **kwargs
+    ):
+        """
+        Initialize reconstruction loss.
+        
+        Args:
+            loss_type: Type of loss to use ('mse', 'l1', 'ssim', 'mse_ssim', etc.)
+            alpha: Weight between losses if using a combined loss like 'mse_ssim'
+            **kwargs: Additional parameters for the underlying loss function
+        """
+        super().__init__()
+        
+        # Use the existing loss registry and get_loss_function utility
+        if loss_type == 'mse_ssim' and 'alpha' not in kwargs:
+            kwargs['alpha'] = alpha
+            
+        self.loss_fn = get_loss_function(loss_type, **kwargs)
+    
+    def forward(self, predictions: torch.Tensor, targets: torch.Tensor) -> torch.Tensor:
+        """
+        Calculate reconstruction loss.
+        
+        Args:
+            predictions: Predicted images from the autoencoder
+            targets: Target images (typically the input images)
+            
+        Returns:
+            Loss value
+        """
+        return self.loss_fn(predictions, targets)
+
 
 class SSIMLoss(nn.Module):
     """
