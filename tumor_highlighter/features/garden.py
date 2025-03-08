@@ -19,7 +19,7 @@ import torch
 from omegaconf import DictConfig, OmegaConf
 from tqdm import tqdm
 
-from tumor_highlighter.features.extractor import FeatureExtractorWrapper
+from tumor_highlighter.features.extractor import FeatureExtractor
 from tumor_highlighter.utils.config import load_config
 
 # Configure logging
