@@ -27,6 +27,204 @@ from tiatoolbox.wsicore.wsireader import WSIReader
 
 logger = logging.getLogger(__name__)
 
+def create_heatmap(
+    heatmap: Union[np.ndarray, torch.Tensor],
+    output_path: Union[str, Path],
+    colormap: str = 'jet',
+    alpha: float = 1.0,
+    title: str = "Tumor Probability Heatmap",
+    figsize: Tuple[int, int] = (10, 8),
+    dpi: int = 300,
+    show_colorbar: bool = True,
+) -> None:
+    """
+    Create and save a visualization of a heatmap.
+    
+    Args:
+        heatmap: Heatmap as numpy array or torch tensor
+        output_path: Path to save the visualization
+        colormap: Colormap to use for visualization
+        alpha: Opacity of the heatmap
+        title: Title for the plot
+        figsize: Figure size in inches
+        dpi: DPI for the saved image
+        show_colorbar: Whether to show the colorbar
+    """
+    # Convert torch tensor to numpy if needed
+    if isinstance(heatmap, torch.Tensor):
+        heatmap = heatmap.detach().cpu().numpy()
+    
+    # Ensure heatmap is 2D
+    if heatmap.ndim > 2:
+        if heatmap.shape[0] == 1:  # Single channel
+            heatmap = heatmap[0]
+        elif heatmap.ndim == 3 and heatmap.shape[2] == 1:  # HWC format
+            heatmap = heatmap[:, :, 0]
+        else:
+            # Take first channel if multi-channel
+            logger.warning(f"Heatmap has {heatmap.ndim} dimensions, taking first channel")
+            heatmap = heatmap[0] if heatmap.shape[0] < heatmap.shape[-1] else heatmap[:, :, 0]
+    
+    # Normalize heatmap to [0, 1] if needed
+    if heatmap.min() < 0 or heatmap.max() > 1:
+        heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min() + 1e-8)
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Display heatmap
+    im = ax.imshow(heatmap, cmap=colormap, alpha=alpha)
+    
+    # Add colorbar if requested
+    if show_colorbar:
+        plt.colorbar(im, ax=ax, label="Probability")
+    
+    # Add title
+    if title:
+        ax.set_title(title)
+    
+    # Remove axis ticks
+    ax.axis('off')
+    
+    # Save figure
+    output_path = Path(output_path)
+    os.makedirs(output_path.parent, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(str(output_path), dpi=dpi, bbox_inches='tight')
+    plt.close(fig)
+    
+    logger.info(f"Saved heatmap to {output_path}")
+
+
+def overlay_heatmap(
+    wsi_path: Union[str, Path],
+    heatmap: Union[np.ndarray, torch.Tensor],
+    output_path: Union[str, Path],
+    resolution: float = 1.0,
+    units: str = "mpp",
+    alpha: float = 0.5,
+    colormap: str = 'jet',
+    threshold: Optional[float] = None,
+    figsize: Tuple[int, int] = (12, 10),
+    dpi: int = 300,
+) -> None:
+    """
+    Overlay a heatmap on a WSI thumbnail.
+    
+    Args:
+        wsi_path: Path to the WSI file
+        heatmap: Heatmap to overlay
+        output_path: Path to save the visualization
+        resolution: Resolution for thumbnail extraction
+        units: Units for resolution ('mpp', 'power', or 'level')
+        alpha: Opacity of the heatmap overlay
+        colormap: Colormap to use for the heatmap
+        threshold: Optional threshold below which heatmap values are transparent
+        figsize: Figure size in inches
+        dpi: DPI for the saved image
+    """
+    from tiatoolbox.wsicore.wsireader import WSIReader
+    
+    # Convert torch tensor to numpy if needed
+    if isinstance(heatmap, torch.Tensor):
+        heatmap = heatmap.detach().cpu().numpy()
+    
+    # Ensure heatmap is 2D
+    if heatmap.ndim > 2:
+        if heatmap.shape[0] == 1:  # Single channel
+            heatmap = heatmap[0]
+        elif heatmap.ndim == 3 and heatmap.shape[2] == 1:  # HWC format
+            heatmap = heatmap[:, :, 0]
+        else:
+            # Take first channel if multi-channel
+            logger.warning(f"Heatmap has {heatmap.ndim} dimensions, taking first channel")
+            heatmap = heatmap[0] if heatmap.shape[0] < heatmap.shape[-1] else heatmap[:, :, 0]
+    
+    # Normalize heatmap to [0, 1] if needed
+    if heatmap.min() < 0 or heatmap.max() > 1:
+        heatmap = (heatmap - heatmap.min()) / (heatmap.max() - heatmap.min() + 1e-8)
+    
+    # Open WSI
+    wsi = WSIReader.open(wsi_path)
+    
+    # Determine level based on resolution and units
+    level = 0
+    if units == "level":
+        level = int(resolution)
+    else:
+        # Find closest level based on resolution
+        if units == "mpp":
+            target_mpp = resolution
+        else:  # power
+            target_mpp = wsi.info.mpp / resolution
+        
+        # Get available MPPs for each level
+        mpps = []
+        for i, downsample in enumerate(wsi.info.level_downsamples):
+            mpps.append(wsi.info.mpp * downsample)
+        
+        # Find level with closest MPP
+        level = min(range(len(mpps)), key=lambda i: abs(mpps[i] - target_mpp))
+    
+    # Get dimensions at the specified level
+    dims = wsi.slide_dimensions(level=level)
+    width, height = dims
+    
+    # Read WSI thumbnail
+    thumbnail = wsi.read_region((0, 0), level, (width, height))
+    
+    # Convert RGBA to RGB if necessary
+    if thumbnail.shape[-1] == 4:
+        thumbnail = thumbnail[:, :, :3]
+    
+    # Resize heatmap to match thumbnail if needed
+    if heatmap.shape != (height, width):
+        import cv2
+        heatmap = cv2.resize(heatmap, (width, height), interpolation=cv2.INTER_LINEAR)
+    
+    # Create figure
+    fig, ax = plt.subplots(figsize=figsize)
+    
+    # Display WSI thumbnail
+    ax.imshow(thumbnail)
+    
+    # Apply threshold if specified
+    if threshold is not None:
+        # Create mask for thresholding
+        mask = heatmap >= threshold
+        
+        # Apply colormap to heatmap
+        colored_heatmap = plt.cm.get_cmap(colormap)(heatmap)
+        
+        # Set alpha based on mask
+        colored_heatmap[..., 3] = mask * alpha
+        
+        # Display overlay
+        ax.imshow(colored_heatmap)
+    else:
+        # Display heatmap overlay without thresholding
+        ax.imshow(heatmap, cmap=colormap, alpha=alpha)
+    
+    # Add colorbar
+    norm = plt.Normalize(0, 1)
+    sm = plt.cm.ScalarMappable(cmap=colormap, norm=norm)
+    sm.set_array([])
+    plt.colorbar(sm, ax=ax, label="Probability")
+    
+    # Add title
+    ax.set_title(f"Heatmap Overlay: {Path(wsi_path).stem}")
+    
+    # Remove axis ticks
+    ax.axis('off')
+    
+    # Save figure
+    output_path = Path(output_path)
+    os.makedirs(output_path.parent, exist_ok=True)
+    plt.tight_layout()
+    plt.savefig(str(output_path), dpi=dpi, bbox_inches='tight')
+    plt.close(fig)
+    
+    logger.info(f"Saved overlay to {output_path}")
 
 def visualize_patches(
     patches: Union[List[np.ndarray], List[torch.Tensor], np.ndarray, torch.Tensor],
